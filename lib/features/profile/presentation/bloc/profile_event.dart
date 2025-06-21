@@ -34,13 +34,13 @@ class UploadProfileImage extends ProfileEvent {
   List<Object> get props => [userId, imageType, imageFile];
 }
 
-class SearchUsers extends ProfileEvent {
-  final String query;
-  final String userId;
-  const SearchUsers(this.query, this.userId);
+class SearchUsersById extends ProfileEvent {
+  final String userIdToSearch;
+  final String currentUserId;
+  const SearchUsersById(this.userIdToSearch, this.currentUserId);
 
   @override
-  List<Object> get props => [query, userId];
+  List<Object> get props => [userIdToSearch, currentUserId];
 }
 
 class SendRelationshipRequest extends ProfileEvent {
@@ -50,4 +50,30 @@ class SendRelationshipRequest extends ProfileEvent {
 
   @override
   List<Object> get props => [fromUserId, toUserId];
+}
+
+class LoadRelationshipRequests extends ProfileEvent {
+  final String currentUserId;
+  const LoadRelationshipRequests(this.currentUserId);
+
+  @override
+  List<Object> get props => [currentUserId];
+}
+
+class AcceptRelationshipRequest extends ProfileEvent {
+  final String currentUserId;
+  final String requestId;
+  const AcceptRelationshipRequest(this.currentUserId, this.requestId);
+
+  @override
+  List<Object> get props => [currentUserId, requestId];
+}
+
+class DeclineRelationshipRequest extends ProfileEvent {
+  final String currentUserId;
+  final String requestId;
+  const DeclineRelationshipRequest(this.currentUserId, this.requestId);
+
+  @override
+  List<Object> get props => [currentUserId, requestId];
 }

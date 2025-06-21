@@ -38,7 +38,7 @@ class ProfileImageUploaded extends ProfileState {
 class ProfileSearching extends ProfileState {}
 
 class ProfileSearchResults extends ProfileState {
-  final List<QueryDocumentSnapshot> results;
+  final List<DocumentSnapshot> results;
   const ProfileSearchResults(this.results);
 
   @override
@@ -46,3 +46,27 @@ class ProfileSearchResults extends ProfileState {
 }
 
 class RelationshipRequestSent extends ProfileState {}
+
+class RelationshipRequestAccepted extends ProfileState {}
+
+class RelationshipRequestDeclined extends ProfileState {}
+
+class RelationshipRequestLoading extends ProfileState {}
+
+class RelationshipRequestsLoaded extends ProfileState {
+  final List<DocumentSnapshot> requests;
+  const RelationshipRequestsLoaded(this.requests);
+
+  @override
+  List<Object> get props => [requests];
+}
+
+class NoRelationshipRequests extends ProfileState {}
+
+class ProfileSearchError extends ProfileState {
+  final String message;
+  const ProfileSearchError(this.message);
+
+  @override
+  List<Object> get props => [message];
+}

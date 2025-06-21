@@ -23,7 +23,7 @@ class _PartnerSearchScreenState extends State<PartnerSearchScreen> {
   void _searchUsers() {
     if (_searchController.text.isNotEmpty) {
       context.read<ProfileBloc>().add(
-        SearchUsers(_searchController.text, widget.currentUserId)
+        SearchUsersById(_searchController.text, widget.currentUserId)
       );
     }
   }
@@ -48,7 +48,7 @@ class _PartnerSearchScreenState extends State<PartnerSearchScreen> {
             TextField(
               controller: _searchController,
               decoration: InputDecoration(
-                labelText: 'Search by display name',
+                labelText: 'Search by User ID', // Changed label
                 suffixIcon: IconButton(
                   icon: const Icon(Icons.search),
                   onPressed: _searchUsers,
@@ -80,7 +80,7 @@ class _PartnerSearchScreenState extends State<PartnerSearchScreen> {
                                 : null,
                           ),
                           title: Text(profile['displayName'] ?? 'No name'),
-                          subtitle: Text(profile['email'] ?? ''),
+                          subtitle: Text('ID: ${user['id']}'), // Display user ID
                           trailing: IconButton(
                             icon: const Icon(Icons.person_add),
                             onPressed: () => _sendRequest(user.id),
@@ -91,7 +91,11 @@ class _PartnerSearchScreenState extends State<PartnerSearchScreen> {
                   );
                 }
 
-                return const Center(child: Text('Search for partners'));
+                if (state is ProfileSearchError) {
+                  return Center(child: Text('Error: ${state.message}'));
+                }
+
+                return const Center(child: Text('Enter a User ID to search for partners'));
               },
             ),
           ],

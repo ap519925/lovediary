@@ -17,7 +17,6 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     on<LoginRequested>(_onLoginRequested);
     on<RegisterRequested>(_onRegisterRequested);
     on<LogoutRequested>(_onLogoutRequested);
-    on<LinkPartnerRequested>(_onLinkPartnerRequested);
   }
 
   Future<void> _onLoginRequested(
@@ -74,32 +73,5 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   ) async {
     await _auth.signOut();
     emit(AuthUnauthenticated());
-  }
-
-  Future<void> _onLinkPartnerRequested(
-    LinkPartnerRequested event,
-    Emitter<AuthState> emit,
-  ) async {
-    emit(AuthLoading());
-    try {
-      final partnerDoc = await _firestore.collection('users').doc(event.partnerId).get();
-      if (!partnerDoc.exists) {
-        emit(AuthFailure('Partner not found'));
-        return;
-      }
-
-      final batch = _firestore.batch();
-      batch.update(_firestore.collection('users').doc(event.userId), {
-        'partnerId': event.partnerId,
-      });
-      batch.update(_firestore.collection('users').doc(event.partnerId), {
-        'partnerId': event.userId,
-      });
-      await batch.commit();
-      
-      emit(PartnerLinkedSuccessfully());
-    } catch (e) {
-      emit(AuthFailure('Failed to link partner: ${e.toString()}'));
-    }
   }
 }

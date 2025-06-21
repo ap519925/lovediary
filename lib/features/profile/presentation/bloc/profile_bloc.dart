@@ -23,8 +23,11 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
     on<LoadProfile>(_onLoadProfile);
     on<UpdateProfile>(_onUpdateProfile);
     on<UploadProfileImage>(_onUploadProfileImage);
-    on<SearchUsers>(_onSearchUsers);
+    on<SearchUsersById>(_onSearchUsersById); // Changed to handle ID search
     on<SendRelationshipRequest>(_onSendRelationshipRequest);
+    on<LoadRelationshipRequests>(_onLoadRelationshipRequests); // New event handler
+    on<AcceptRelationshipRequest>(_onAcceptRelationshipRequest); // New event handler
+    on<DeclineRelationshipRequest>(_onDeclineRelationshipRequest); // New event handler
   }
 
   Future<void> _onLoadProfile(
@@ -113,20 +116,22 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
     }
   }
 
-  Future<void> _onSearchUsers(
-    SearchUsers event,
+  Future<void> _onSearchUsersById( // Updated method name and logic
+    SearchUsersById event,
     Emitter<ProfileState> emit,
   ) async {
     emit(ProfileSearching());
     try {
-      final queryLower = event.query.toLowerCase();
       final snapshot = await firestore.collection('users')
-        .where('profile.searchableName', isGreaterThanOrEqualTo: queryLower)
-        .where('profile.searchableName', isLessThan: '${queryLower}z')
+        .where('userId', isEqualTo: event.userIdToSearch)
         .get(const GetOptions(source: Source.server));
       
-      final results = snapshot.docs.where((doc) => doc.id != event.userId).toList();
-      emit(ProfileSearchResults(results));
+      final results = snapshot.docs.where((doc) => doc.id != event.currentUserId).toList();
+      if (results.isNotEmpty) {
+        emit(ProfileSearchResults(results));
+      } else {
+        emit(ProfileError('No user found with that ID.'));
+      }
     } catch (e) {
       emit(ProfileError('Search failed: ${e.toString()}'));
     }
@@ -136,8 +141,27 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
     SendRelationshipRequest event,
     Emitter<ProfileState> emit,
   ) async {
-    emit(ProfileLoading());
+    emit(RelationshipRequestLoading());
     try {
+      // Check if a request already exists between these users
+      final existingRequests = await firestore.collection('relationship_requests')
+          .where('fromUserId', isEqualTo: event.fromUserId)
+          .where('toUserId', isEqualTo: event.toUserId)
+          .where('status', isEqualTo: 'pending')
+          .get();
+
+      final existingReverseRequests = await firestore.collection('relationship_requests')
+          .where('fromUserId', isEqualTo: event.toUserId)
+          .where('toUserId', isEqualTo: event.fromUserId)
+          .where('status', isEqualTo: 'pending')
+          .get();
+
+      if (existingRequests.docs.isNotEmpty || existingReverseRequests.docs.isNotEmpty) {
+        emit(ProfileError('A pending request already exists with this user.'));
+        return;
+      }
+
+
       await firestore.runTransaction((transaction) async {
         final requestsRef = firestore.collection('relationship_requests');
         transaction.set(requestsRef.doc(), {
@@ -150,6 +174,79 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
       emit(RelationshipRequestSent());
     } catch (e) {
       emit(ProfileError('Failed to send request: ${e.toString()}'));
+    }
+  }
+
+  Future<void> _onLoadRelationshipRequests(
+    LoadRelationshipRequests event,
+    Emitter<ProfileState> emit,
+  ) async {
+    emit(RelationshipRequestLoading());
+    try {
+      final snapshot = await firestore.collection('relationship_requests')
+          .where('toUserId', isEqualTo: event.currentUserId)
+          .where('status', isEqualTo: 'pending')
+          .get();
+
+      if (snapshot.docs.isNotEmpty) {
+        emit(RelationshipRequestsLoaded(snapshot.docs));
+      } else {
+        emit(NoRelationshipRequests());
+      }
+    } catch (e) {
+      emit(ProfileError('Failed to load requests: ${e.toString()}'));
+    }
+  }
+
+  Future<void> _onAcceptRelationshipRequest(
+    AcceptRelationshipRequest event,
+    Emitter<ProfileState> emit,
+  ) async {
+    emit(RelationshipRequestLoading());
+    try {
+      await firestore.runTransaction((transaction) async {
+        final requestDoc = await transaction.get(
+            firestore.collection('relationship_requests').doc(event.requestId));
+
+        if (!requestDoc.exists) {
+          throw Exception('Request not found');
+        }
+
+        final fromUserId = requestDoc.data()!['fromUserId'];
+        final toUserId = requestDoc.data()!['toUserId'];
+
+        // Update request status
+        transaction.update(requestDoc.reference, {'status': 'accepted'});
+
+        // Link partners in user profiles
+        transaction.update(firestore.collection('users').doc(fromUserId), {
+          'profile.partnerId': toUserId,
+          'profile.relationshipStatus': 'linked',
+        });
+        transaction.update(firestore.collection('users').doc(toUserId), {
+          'profile.partnerId': fromUserId,
+          'profile.relationshipStatus': 'linked',
+        });
+      });
+      emit(RelationshipRequestAccepted());
+    } catch (e) {
+      emit(ProfileError('Failed to accept request: ${e.toString()}'));
+    }
+  }
+
+  Future<void> _onDeclineRelationshipRequest(
+    DeclineRelationshipRequest event,
+    Emitter<ProfileState> emit,
+  ) async {
+    emit(RelationshipRequestLoading());
+    try {
+      await firestore.runTransaction((transaction) async {
+        final requestDoc = firestore.collection('relationship_requests').doc(event.requestId);
+        transaction.update(requestDoc, {'status': 'declined'});
+      });
+      emit(RelationshipRequestDeclined());
+    } catch (e) {
+      emit(ProfileError('Failed to decline request: ${e.toString()}'));
     }
   }
 }
