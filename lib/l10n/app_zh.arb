@@ -1,0 +1,13 @@
+{
+  "@@locale": "zh",
+  "appTitle": "恋爱日记",
+  "login": "登录",
+  "register": "注册",
+  "home": "首页",
+  "profile": "个人资料",
+  "settings": "设置",
+  "language": "语言",
+  "english": "英文",
+  "chinese": "中文",
+  "selectLanguage": "选择语言"
+}

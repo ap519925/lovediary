@@ -1,0 +1,13 @@
+{
+  "@@locale": "en",
+  "appTitle": "LoveDiary",
+  "login": "Login",
+  "register": "Register",
+  "home": "Home",
+  "profile": "Profile",
+  "settings": "Settings",
+  "language": "Language",
+  "english": "English",
+  "chinese": "Chinese",
+  "selectLanguage": "Select Language"
+}
