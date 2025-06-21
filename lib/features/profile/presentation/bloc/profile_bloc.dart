@@ -215,17 +215,24 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
         final fromUserId = requestDoc.data()!['fromUserId'];
         final toUserId = requestDoc.data()!['toUserId'];
 
+        // Get current timestamp for relationship start date
+        final Timestamp now = Timestamp.now();
+
         // Update request status
         transaction.update(requestDoc.reference, {'status': 'accepted'});
 
-        // Link partners in user profiles
+        // Link partners in user profiles and set relationship start date
         transaction.update(firestore.collection('users').doc(fromUserId), {
           'profile.partnerId': toUserId,
           'profile.relationshipStatus': 'linked',
+          'profile.relationshipStartDate': now,
+          'profile.anniversaryDate': now, // Set anniversary to start date initially
         });
         transaction.update(firestore.collection('users').doc(toUserId), {
           'profile.partnerId': fromUserId,
           'profile.relationshipStatus': 'linked',
+          'profile.relationshipStartDate': now,
+          'profile.anniversaryDate': now, // Set anniversary to start date initially
         });
       });
       emit(RelationshipRequestAccepted());

@@ -77,3 +77,29 @@ class DeclineRelationshipRequest extends ProfileEvent {
   @override
   List<Object> get props => [currentUserId, requestId];
 }
+
+class LoadDashboardData extends ProfileEvent {
+  final String currentUserId;
+  const LoadDashboardData(this.currentUserId);
+
+  @override
+  List<Object> get props => [currentUserId];
+}
+
+class SetAnniversaryDate extends ProfileEvent {
+  final String relationshipId;
+  final DateTime anniversaryDate;
+
+  const SetAnniversaryDate(this.relationshipId, this.anniversaryDate);
+
+  @override
+  List<Object> get props => [relationshipId, anniversaryDate];
+}
+
+class UpdateUserLocation extends ProfileEvent {
+  final String userId;
+  const UpdateUserLocation(this.userId);
+
+  @override
+  List<Object> get props => [userId];
+}

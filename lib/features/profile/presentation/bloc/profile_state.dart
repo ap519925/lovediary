@@ -4,7 +4,7 @@ abstract class ProfileState extends Equatable {
   const ProfileState();
 
   @override
-  List<Object> get props => [];
+  List<Object?> get props => [];
 }
 
 class ProfileInitial extends ProfileState {}
@@ -69,4 +69,21 @@ class ProfileSearchError extends ProfileState {
 
   @override
   List<Object> get props => [message];
+}
+
+class DashboardDataLoading extends ProfileState {}
+
+class DashboardDataLoaded extends ProfileState {
+  final Map<String, dynamic> userProfile;
+  final Map<String, dynamic>? partnerProfile;
+  final Map<String, dynamic>? relationshipData;
+
+  const DashboardDataLoaded({
+    required this.userProfile,
+    this.partnerProfile,
+    this.relationshipData,
+  });
+
+  @override
+  List<Object?> get props => [userProfile, partnerProfile, relationshipData];
 }

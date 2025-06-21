@@ -1,6 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_messaging/firebase_messaging.dart'; // Import FirebaseMessaging
 import 'auth_event.dart';
 import 'auth_state.dart';
 
@@ -29,6 +30,13 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         email: event.email,
         password: event.password,
       );
+      // Get FCM token and save it to user document
+      final String? fcmToken = await FirebaseMessaging.instance.getToken();
+      if (fcmToken != null && userCredential.user != null) {
+        await _firestore.collection('users').doc(userCredential.user!.uid).update({
+          'fcmToken': fcmToken,
+        });
+      }
       emit(AuthAuthenticated(userCredential.user!));
     } catch (e) {
       emit(AuthFailure(e.toString()));
@@ -45,10 +53,14 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         email: event.email,
         password: event.password,
       );
+      // Get FCM token and save it to user document during registration
+      final String? fcmToken = await FirebaseMessaging.instance.getToken();
+      
       await _firestore.collection('users').doc(userCredential.user!.uid).set({
         'email': event.email,
         'createdAt': FieldValue.serverTimestamp(),
         'userId': userCredential.user!.uid,
+        'fcmToken': fcmToken, // Save FCM token here
         'profile': {
           'name': '',
           'displayName': '',
@@ -58,7 +70,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
           'relationshipPoints': 0,
           'partnerId': '',
           'relationshipStatus': 'single',
-          'searchableName': '' // For case-insensitive search
+          'searchableName': '', // For case-insensitive search
+          'relationshipStartDate': null, // Added for relationship stats
+          'anniversaryDate': null,       // Added for relationship stats
         }
       });
       emit(AuthAuthenticated(userCredential.user!));
@@ -71,6 +85,11 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     LogoutRequested event,
     Emitter<AuthState> emit,
   ) async {
+    // Optionally remove FCM token from Firestore on logout
+    // final currentUser = _auth.currentUser;
+    // if (currentUser != null) {
+    //   await _firestore.collection('users').doc(currentUser.uid).update({'fcmToken': FieldValue.delete()});
+    // }
     await _auth.signOut();
     emit(AuthUnauthenticated());
   }
