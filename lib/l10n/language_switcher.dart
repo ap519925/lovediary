@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:lovediary/features/language/presentation/bloc/language_bloc.dart';
+import 'package:lovediary/features/language/presentation/bloc/language_event.dart';
+import 'package:lovediary/features/language/presentation/bloc/language_state.dart';
 import 'package:lovediary/l10n/app_localizations.dart';
 
 class LanguageSwitcher extends StatelessWidget {
@@ -6,23 +10,27 @@ class LanguageSwitcher extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    
-    return DropdownButton<Locale>(
-      value: Localizations.localeOf(context),
-      items: [
-        DropdownMenuItem(
-          value: const Locale('en'),
-          child: Text(AppLocalizations.of(context)!.english),
-        ),
-        DropdownMenuItem(
-          value: const Locale('zh'),
-          child: Text(AppLocalizations.of(context)!.chinese),
-        ),
-      ],
-      onChanged: (Locale? newLocale) {
-        if (newLocale != null) {
-          // TODO: Implement language change logic
-        }
+    return BlocBuilder<LanguageBloc, LanguageState>(
+      builder: (context, state) {
+        final localizations = AppLocalizations.of(context);
+        return DropdownButton<Locale>(
+          value: state.locale,
+          items: [
+            DropdownMenuItem(
+              value: const Locale('en'),
+              child: Text(localizations?.english ?? 'English'),
+            ),
+            DropdownMenuItem(
+              value: const Locale('zh'),
+              child: Text(localizations?.chinese ?? 'Chinese'),
+            ),
+          ],
+          onChanged: (Locale? newLocale) {
+            if (newLocale != null) {
+              context.read<LanguageBloc>().add(ChangeLanguage(newLocale));
+            }
+          },
+        );
       },
     );
   }

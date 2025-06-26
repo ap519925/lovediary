@@ -10,9 +10,9 @@ abstract class MapEvent extends Equatable {
 class LoadCurrentLocation extends MapEvent {}
 
 class UpdateLocation extends MapEvent {
-  final LatLng location;
 
   const UpdateLocation(this.location);
+  final LatLng location;
 
   @override
   List<Object> get props => [location];

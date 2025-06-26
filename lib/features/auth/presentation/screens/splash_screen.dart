@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/animation.dart';
 import 'package:lovediary/features/auth/presentation/screens/login_screen.dart';
 import 'package:lovediary/features/auth/presentation/screens/register_screen.dart';
 import 'package:lovediary/features/theme/presentation/widgets/theme_toggle.dart';
+import 'package:lovediary/l10n/app_localizations.dart';
 
 class SplashScreen extends StatefulWidget {
   static const routeName = '/splash';
@@ -160,7 +160,7 @@ class _SplashScreenState extends State<SplashScreen>
                           elevation: 0,
                         ),
                         onPressed: () => Navigator.pushNamed(context, LoginScreen.routeName),
-                        child: const Text('Login'),
+                        child: Text(AppLocalizations.of(context)?.login ?? 'Login'),
                       ),
                     ),
                     
@@ -175,7 +175,7 @@ class _SplashScreenState extends State<SplashScreen>
                           padding: const EdgeInsets.symmetric(vertical: 16),
                         ),
                         onPressed: () => Navigator.pushNamed(context, RegisterScreen.routeName),
-                        child: const Text('Create Account'),
+                        child: Text(AppLocalizations.of(context)?.register ?? 'Register'),
                       ),
                     ),
                   ],

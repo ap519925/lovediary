@@ -31,29 +31,30 @@
 
   <title>lovediary</title>
   <link rel="manifest" href="manifest.json">
-</head>
-<body>
+  
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
-
-  <!-- Firebase Initialization -->
+  
+  <!-- Google Maps JavaScript API -->
+  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBGDS94olWagAO-_0d3nrpCRFtYnD_0hxM&libraries=geometry"></script>
+  
+  <!-- Firebase Config -->
   <script>
     const firebaseConfig = {
-      apiKey: "YOUR_API_KEY",
-      authDomain: "YOUR_AUTH_DOMAIN",
-      projectId: "YOUR_PROJECT_ID",
-      storageBucket: "YOUR_STORAGE_BUCKET",
-      messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-      appId: "YOUR_APP_ID"
+      apiKey: "AIzaSyBl9HgLgboUCPrf8OS5wbEjcpdLmKsJxxg",
+      authDomain: "love-diary-776dc.firebaseapp.com",
+      projectId: "love-diary-776dc",
+      storageBucket: "love-diary-776dc.appspot.com",
+      messagingSenderId: "994710597903",
+      appId: "1:994710597903:web:YOUR_WEB_APP_ID"
     };
-
-    // Initialize Firebase
     firebase.initializeApp(firebaseConfig);
   </script>
-
+</head>
+<body>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

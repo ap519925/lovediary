@@ -4,7 +4,7 @@ abstract class ProfileState extends Equatable {
   const ProfileState();
 
   @override
-  List<Object?> get props => [];
+  List<Object> get props => [];
 }
 
 class ProfileInitial extends ProfileState {}
@@ -38,7 +38,7 @@ class ProfileImageUploaded extends ProfileState {
 class ProfileSearching extends ProfileState {}
 
 class ProfileSearchResults extends ProfileState {
-  final List<DocumentSnapshot> results;
+  final List<QueryDocumentSnapshot> results;
   const ProfileSearchResults(this.results);
 
   @override
@@ -49,41 +49,37 @@ class RelationshipRequestSent extends ProfileState {}
 
 class RelationshipRequestAccepted extends ProfileState {}
 
-class RelationshipRequestDeclined extends ProfileState {}
-
-class RelationshipRequestLoading extends ProfileState {}
+class RelationshipRequestRejected extends ProfileState {}
 
 class RelationshipRequestsLoaded extends ProfileState {
-  final List<DocumentSnapshot> requests;
-  const RelationshipRequestsLoaded(this.requests);
-
-  @override
-  List<Object> get props => [requests];
-}
-
-class NoRelationshipRequests extends ProfileState {}
-
-class ProfileSearchError extends ProfileState {
-  final String message;
-  const ProfileSearchError(this.message);
-
-  @override
-  List<Object> get props => [message];
-}
-
-class DashboardDataLoading extends ProfileState {}
-
-class DashboardDataLoaded extends ProfileState {
-  final Map<String, dynamic> userProfile;
-  final Map<String, dynamic>? partnerProfile;
-  final Map<String, dynamic>? relationshipData;
-
-  const DashboardDataLoaded({
-    required this.userProfile,
-    this.partnerProfile,
-    this.relationshipData,
+  final List<QueryDocumentSnapshot> incomingRequests;
+  final List<QueryDocumentSnapshot> outgoingRequests;
+  final List<QueryDocumentSnapshot> relationships;
+  
+  const RelationshipRequestsLoaded({
+    required this.incomingRequests,
+    required this.outgoingRequests,
+    required this.relationships,
   });
 
   @override
-  List<Object?> get props => [userProfile, partnerProfile, relationshipData];
+  List<Object> get props => [incomingRequests, outgoingRequests, relationships];
 }
+
+class PostImageUploaded extends ProfileState {
+  final String imageUrl;
+  PostImageUploaded(this.imageUrl);
+
+  @override
+  List<Object> get props => [imageUrl];
+}
+
+class PostsLoaded extends ProfileState {
+  final List<QueryDocumentSnapshot> posts;
+  PostsLoaded(this.posts);
+
+  @override
+  List<Object> get props => [posts];
+}
+
+class PostCreated extends ProfileState {}

@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:lovediary/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:lovediary/features/auth/presentation/bloc/auth_state.dart';
 import 'package:lovediary/features/auth/presentation/bloc/auth_event.dart';
 import 'package:lovediary/features/auth/presentation/screens/register_screen.dart';
-import 'package:lovediary/features/home/presentation/screens/main_navigation_screen.dart';
 import 'package:lovediary/features/theme/presentation/widgets/theme_toggle.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -40,31 +38,7 @@ class _LoginScreenState extends State<LoginScreen> {
             child: ThemeToggle(),
           ),
           
-          // Background elements
-          Positioned(
-            top: -100,
-            right: -100,
-            child: Container(
-              width: 300,
-              height: 300,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: const Color(0xFF80D2F3).withOpacity(0.05),
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: -150,
-            left: -100,
-            child: Container(
-              width: 400,
-              height: 400,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: const Color(0xFFF38AB3).withOpacity(0.05),
-              ),
-            ),
-          ),
+          // Background elements removed to prevent color bleeding
           
           // Main content
           Center(
@@ -166,19 +140,19 @@ class _LoginScreenState extends State<LoginScreen> {
                         );
                       }
                       if (state is AuthAuthenticated) {
-                        final user = FirebaseAuth.instance.currentUser;
-                        Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => MainNavigationScreen(
-                              partner1Name: 'User',
-                              partner2Name: 'Partner',
-                              anniversaryDate: DateTime.now(),
-                              distanceApart: 0,
-                              nextMeetingDate: DateTime.now().add(const Duration(days: 30)),
-                              userId: user?.uid ?? '',
-                            ),
-                          ),
+                        final profile = state.userData['profile'] as Map<String, dynamic>? ?? {};
+                        Navigator.pushReplacementNamed(
+                          context, 
+                          '/main',
+                          arguments: {
+                            'partner1Name': state.userData['partner1Name'] ?? 'Partner 1',
+                            'partner2Name': state.userData['partner2Name'] ?? 'Partner 2',
+                            'anniversaryDate': state.userData['anniversaryDate'] ?? DateTime.now(),
+                            'distanceApart': state.userData['distanceApart'] ?? 0.0,
+                            'nextMeetingDate': state.userData['nextMeetingDate'] ?? DateTime.now(),
+                            'partner1Image': profile['avatarUrl'],
+                            'partner2Image': null,
+                          },
                         );
                       }
                     },

@@ -4,14 +4,12 @@ import 'package:lovediary/features/home/presentation/screens/dashboard_screen.da
 import 'package:lovediary/features/map/presentation/screens/map_screen.dart';
 import 'package:lovediary/features/profile/presentation/screens/profile_screen.dart';
 import 'package:lovediary/features/calendar/presentation/screens/calendar_screen.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:lovediary/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:lovediary/features/auth/presentation/bloc/auth_event.dart';
-import 'package:lovediary/features/profile/presentation/bloc/profile_bloc.dart';
 import 'package:lovediary/features/map/presentation/bloc/map_bloc.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_storage/firebase_storage.dart';
+import 'package:lovediary/l10n/app_localizations.dart';
 
 class MainNavigationScreen extends StatefulWidget {
   final String partner1Name;
@@ -45,19 +43,56 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     GlobalKey<NavigatorState>(),
   ];
 
+  Future<String?> _getPartnerId(String userId) async {
+    try {
+      // Get the user document
+      final userDoc = await FirebaseFirestore.instance.collection('users').doc(userId).get();
+      
+      if (!userDoc.exists) {
+        print('User document not found');
+        return null;
+      }
+      
+      final userData = userDoc.data();
+      
+      // Check if the user has a partner field
+      if (userData != null && userData.containsKey('partnerId')) {
+        final partnerId = userData['partnerId'] as String?;
+        print('Found partner ID: $partnerId');
+        return partnerId;
+      }
+      
+      // If no direct partner ID, check relationship collection
+      final relationshipQuery = await FirebaseFirestore.instance
+          .collection('relationships')
+          .where('users', arrayContains: userId)
+          .limit(1)
+          .get();
+      
+      if (relationshipQuery.docs.isNotEmpty) {
+        final relationshipData = relationshipQuery.docs.first.data();
+        final users = relationshipData['users'] as List<dynamic>;
+        
+        // Find the other user in the relationship
+        for (final user in users) {
+          if (user != userId) {
+            print('Found partner ID from relationship: $user');
+            return user as String;
+          }
+        }
+      }
+      
+      // User doesn't have a partner yet - this is normal for new users
+      return null;
+    } catch (e) {
+      print('Error getting partner ID: $e');
+      return null;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return MultiBlocProvider(
-      providers: [
-        BlocProvider(
-          create: (context) => ProfileBloc(
-            firestore: FirebaseFirestore.instance,
-            storage: FirebaseStorage.instance,
-            auth: FirebaseAuth.instance,
-          ),
-        ),
-      ],
-      child: WillPopScope(
+    return WillPopScope(
         onWillPop: () async {
           final currentNavigator = _navigatorKeys[_selectedIndex];
           if (currentNavigator.currentState?.canPop() ?? false) {
@@ -68,12 +103,17 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         },
         child: Scaffold(
           appBar: AppBar(
-            title: const Text('Love Diary'),
+            title: Text(AppLocalizations.of(context)?.appTitle ?? 'Love Diary'),
             actions: [
+              IconButton(
+                icon: const Icon(Icons.settings),
+                onPressed: () => Navigator.pushNamed(context, '/settings'),
+                tooltip: AppLocalizations.of(context)?.settings ?? 'Settings',
+              ),
               IconButton(
                 icon: const Icon(Icons.logout),
                 onPressed: () => context.read<AuthBloc>().add(const LogoutRequested()),
-                tooltip: 'Logout',
+                tooltip: AppLocalizations.of(context)?.logout ?? 'Logout',
               ),
             ],
           ),
@@ -107,13 +147,24 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
               Navigator(
                 key: _navigatorKeys[3],
                 onGenerateRoute: (settings) => MaterialPageRoute(
-                  builder: (context) => BlocProvider(
-                    create: (context) => MapBloc(
-                      firestore: FirebaseFirestore.instance,
-                      userId: widget.userId,
-                      partnerId: 'PARTNER_ID', // Replace with actual partner ID
-                    ),
-                    child: const MapScreen(),
+                  builder: (context) => FutureBuilder<String?>(
+                    future: _getPartnerId(widget.userId),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
+                      
+                      final partnerId = snapshot.data ?? '';
+                      
+                      return BlocProvider(
+                        create: (context) => MapBloc(
+                          firestore: FirebaseFirestore.instance,
+                          userId: widget.userId,
+                          partnerId: partnerId,
+                        ),
+                        child: const MapScreen(),
+                      );
+                    },
                   ),
                 ),
               ),
@@ -126,26 +177,26 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             ],
           ),
           bottomNavigationBar: BottomNavigationBar(
-            items: const <BottomNavigationBarItem>[
+            items: <BottomNavigationBarItem>[
               BottomNavigationBarItem(
-                icon: Icon(Icons.home),
-                label: 'Home',
+                icon: const Icon(Icons.home),
+                label: AppLocalizations.of(context)?.home ?? 'Home',
               ),
               BottomNavigationBarItem(
-                icon: Icon(Icons.chat),
-                label: 'Chat',
+                icon: const Icon(Icons.chat),
+                label: AppLocalizations.of(context)?.chat ?? 'Chat',
               ),
               BottomNavigationBarItem(
-                icon: Icon(Icons.calendar_today),
-                label: 'Calendar',
+                icon: const Icon(Icons.calendar_today),
+                label: AppLocalizations.of(context)?.calendar ?? 'Calendar',
               ),
               BottomNavigationBarItem(
-                icon: Icon(Icons.map),
-                label: 'Map',
+                icon: const Icon(Icons.map),
+                label: AppLocalizations.of(context)?.map ?? 'Map',
               ),
               BottomNavigationBarItem(
-                icon: Icon(Icons.person),
-                label: 'Profile',
+                icon: const Icon(Icons.person),
+                label: AppLocalizations.of(context)?.profile ?? 'Profile',
               ),
             ],
             currentIndex: _selectedIndex,
@@ -159,7 +210,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
               });
             },
           ),
-        ),
       ),
     );
   }

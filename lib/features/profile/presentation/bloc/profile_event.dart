@@ -34,13 +34,13 @@ class UploadProfileImage extends ProfileEvent {
   List<Object> get props => [userId, imageType, imageFile];
 }
 
-class SearchUsersById extends ProfileEvent {
-  final String userIdToSearch;
-  final String currentUserId;
-  const SearchUsersById(this.userIdToSearch, this.currentUserId);
+class SearchUsers extends ProfileEvent {
+  final String query;
+  final String userId;
+  const SearchUsers(this.query, this.userId);
 
   @override
-  List<Object> get props => [userIdToSearch, currentUserId];
+  List<Object> get props => [query, userId];
 }
 
 class SendRelationshipRequest extends ProfileEvent {
@@ -52,54 +52,53 @@ class SendRelationshipRequest extends ProfileEvent {
   List<Object> get props => [fromUserId, toUserId];
 }
 
-class LoadRelationshipRequests extends ProfileEvent {
-  final String currentUserId;
-  const LoadRelationshipRequests(this.currentUserId);
-
-  @override
-  List<Object> get props => [currentUserId];
-}
-
 class AcceptRelationshipRequest extends ProfileEvent {
-  final String currentUserId;
   final String requestId;
-  const AcceptRelationshipRequest(this.currentUserId, this.requestId);
+  const AcceptRelationshipRequest(this.requestId);
 
   @override
-  List<Object> get props => [currentUserId, requestId];
+  List<Object> get props => [requestId];
 }
 
-class DeclineRelationshipRequest extends ProfileEvent {
-  final String currentUserId;
+class RejectRelationshipRequest extends ProfileEvent {
   final String requestId;
-  const DeclineRelationshipRequest(this.currentUserId, this.requestId);
+  const RejectRelationshipRequest(this.requestId);
 
   @override
-  List<Object> get props => [currentUserId, requestId];
+  List<Object> get props => [requestId];
 }
 
-class LoadDashboardData extends ProfileEvent {
-  final String currentUserId;
-  const LoadDashboardData(this.currentUserId);
-
-  @override
-  List<Object> get props => [currentUserId];
-}
-
-class SetAnniversaryDate extends ProfileEvent {
-  final String relationshipId;
-  final DateTime anniversaryDate;
-
-  const SetAnniversaryDate(this.relationshipId, this.anniversaryDate);
-
-  @override
-  List<Object> get props => [relationshipId, anniversaryDate];
-}
-
-class UpdateUserLocation extends ProfileEvent {
+class FetchRelationshipRequests extends ProfileEvent {
   final String userId;
-  const UpdateUserLocation(this.userId);
+  const FetchRelationshipRequests(this.userId);
 
   @override
   List<Object> get props => [userId];
+}
+
+class CreatePost extends ProfileEvent {
+  final String userId;
+  final String content;
+  final String? imageUrl;
+  const CreatePost(this.userId, this.content, {this.imageUrl});
+
+  @override
+  List<Object> get props => [userId, content];
+}
+
+class FetchPosts extends ProfileEvent {
+  final String userId;
+  const FetchPosts(this.userId);
+
+  @override
+  List<Object> get props => [userId];
+}
+
+class UploadPostImage extends ProfileEvent {
+  final String userId;
+  final XFile imageFile;
+  const UploadPostImage(this.userId, this.imageFile);
+
+  @override
+  List<Object> get props => [userId, imageFile];
 }

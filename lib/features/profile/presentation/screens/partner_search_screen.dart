@@ -23,7 +23,7 @@ class _PartnerSearchScreenState extends State<PartnerSearchScreen> {
   void _searchUsers() {
     if (_searchController.text.isNotEmpty) {
       context.read<ProfileBloc>().add(
-        SearchUsersById(_searchController.text, widget.currentUserId)
+        SearchUsers(_searchController.text, widget.currentUserId)
       );
     }
   }
@@ -45,16 +45,27 @@ class _PartnerSearchScreenState extends State<PartnerSearchScreen> {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
+            // Search by code or display name
             TextField(
               controller: _searchController,
               decoration: InputDecoration(
-                labelText: 'Search by User ID', // Changed label
+                labelText: 'Enter partner code or display name',
+                hintText: 'e.g. ABC123 or John Doe',
                 suffixIcon: IconButton(
                   icon: const Icon(Icons.search),
                   onPressed: _searchUsers,
                 ),
+                border: const OutlineInputBorder(),
               ),
               onSubmitted: (_) => _searchUsers(),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Tip: Searching by partner code is more accurate',
+              style: TextStyle(
+                color: Colors.grey,
+                fontSize: 12,
+              ),
             ),
             const SizedBox(height: 20),
             BlocBuilder<ProfileBloc, ProfileState>(
@@ -79,8 +90,27 @@ class _PartnerSearchScreenState extends State<PartnerSearchScreen> {
                                 ? const Icon(Icons.person)
                                 : null,
                           ),
-                          title: Text(profile['displayName'] ?? 'No name'),
-                          subtitle: Text('ID: ${user['id']}'), // Display user ID
+                          title: Row(
+                            children: [
+                              Text(profile['displayName'] ?? 'No name'),
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey[800],
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  user['userCode'] ?? '',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          subtitle: Text(profile['email'] ?? ''),
                           trailing: IconButton(
                             icon: const Icon(Icons.person_add),
                             onPressed: () => _sendRequest(user.id),
@@ -91,11 +121,7 @@ class _PartnerSearchScreenState extends State<PartnerSearchScreen> {
                   );
                 }
 
-                if (state is ProfileSearchError) {
-                  return Center(child: Text('Error: ${state.message}'));
-                }
-
-                return const Center(child: Text('Enter a User ID to search for partners'));
+                return const Center(child: Text('Search for partners'));
               },
             ),
           ],

@@ -4,6 +4,7 @@ import 'package:equatable/equatable.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:lovediary/features/map/data/location_service.dart';
 
 part 'map_event.dart';
 part 'map_state.dart';
@@ -27,21 +28,47 @@ class MapBloc extends Bloc<MapEvent, MapState> {
     LoadCurrentLocation event,
     Emitter<MapState> emit,
   ) async {
+    if (isClosed) return; // Prevent events after bloc is closed
+    
     emit(MapLoading());
     try {
       final position = await Geolocator.getCurrentPosition();
       final currentLocation = LatLng(position.latitude, position.longitude);
       
       // Start listening to location updates
+      _locationSubscription?.cancel(); // Cancel any existing subscription
       _locationSubscription = Geolocator.getPositionStream().listen((position) {
-        add(UpdateLocation(LatLng(position.latitude, position.longitude)));
+        if (!isClosed) { // Check if bloc is still active before adding events
+          add(UpdateLocation(LatLng(position.latitude, position.longitude)));
+        }
       });
 
       // Get partner location from Firestore
       final partnerLocation = await _getPartnerLocation();
-      emit(MapLoaded(currentLocation, partnerLocation));
+      
+      // Get location information
+      final currentLocationInfo = await LocationService.getLocationInfo(currentLocation);
+      LocationInfo? partnerLocationInfo;
+      double? distance;
+      
+      if (partnerLocation != null) {
+        partnerLocationInfo = await LocationService.getLocationInfo(partnerLocation);
+        distance = LocationService.calculateDistance(currentLocation, partnerLocation);
+      }
+      
+      if (!isClosed) { // Check before emitting
+        emit(MapLoaded(
+          currentLocation, 
+          partnerLocation,
+          currentLocationInfo: currentLocationInfo,
+          partnerLocationInfo: partnerLocationInfo,
+          distance: distance,
+        ));
+      }
     } catch (e) {
-      emit(MapError('Failed to load locations: ${e.toString()}'));
+      if (!isClosed) { // Check before emitting
+        emit(MapError('Failed to load locations: ${e.toString()}'));
+      }
     }
   }
 
@@ -49,10 +76,29 @@ class MapBloc extends Bloc<MapEvent, MapState> {
     UpdateLocation event,
     Emitter<MapState> emit,
   ) async {
+    if (isClosed) return; // Prevent events after bloc is closed
+    
     if (state is MapLoaded) {
       final currentState = state as MapLoaded;
       final partnerLocation = await _getPartnerLocation();
-      emit(MapLoaded(event.location, partnerLocation));
+      
+      // Get location information
+      final currentLocationInfo = await LocationService.getLocationInfo(event.location);
+      LocationInfo? partnerLocationInfo;
+      double? distance;
+      
+      if (partnerLocation != null) {
+        partnerLocationInfo = await LocationService.getLocationInfo(partnerLocation);
+        distance = LocationService.calculateDistance(event.location, partnerLocation);
+      }
+      
+      emit(MapLoaded(
+        event.location, 
+        partnerLocation,
+        currentLocationInfo: currentLocationInfo,
+        partnerLocationInfo: partnerLocationInfo,
+        distance: distance,
+      ));
     }
   }
 

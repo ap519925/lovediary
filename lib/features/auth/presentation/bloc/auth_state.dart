@@ -14,10 +14,11 @@ class AuthLoading extends AuthState {}
 
 class AuthAuthenticated extends AuthState {
   final User user;
-  const AuthAuthenticated(this.user);
+  final Map<String, dynamic> userData;
+  const AuthAuthenticated(this.user, {this.userData = const {}});
 
   @override
-  List<Object> get props => [user];
+  List<Object> get props => [user, userData];
 }
 
 class AuthUnauthenticated extends AuthState {}

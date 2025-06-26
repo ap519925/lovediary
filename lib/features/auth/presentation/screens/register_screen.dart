@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:lovediary/features/auth/presentation/bloc/auth_bloc.dart';
-import 'package:lovediary/features/auth/presentation/bloc/auth_state.dart';
 import 'package:lovediary/features/auth/presentation/bloc/auth_event.dart';
+import 'package:lovediary/features/auth/presentation/bloc/auth_state.dart';
 import 'package:lovediary/features/auth/presentation/screens/login_screen.dart';
 import 'package:lovediary/features/theme/presentation/widgets/theme_toggle.dart';
 
 class RegisterScreen extends StatefulWidget {
-  static const routeName = '/register';
   const RegisterScreen({super.key});
+  static const routeName = '/register';
 
   @override
   State<RegisterScreen> createState() => _RegisterScreenState();
@@ -186,6 +186,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       if (state is AuthFailure) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(content: Text(state.message)),
+                        );
+                      }
+                      if (state is AuthAuthenticated) {
+                        final profile = state.userData['profile'] as Map<String, dynamic>? ?? {};
+                        Navigator.pushReplacementNamed(
+                          context, 
+                          '/main',
+                          arguments: {
+                            'partner1Name': state.userData['partner1Name'] ?? 'Partner 1',
+                            'partner2Name': state.userData['partner2Name'] ?? 'Partner 2',
+                            'anniversaryDate': state.userData['anniversaryDate'] ?? DateTime.now(),
+                            'distanceApart': state.userData['distanceApart'] ?? 0.0,
+                            'nextMeetingDate': state.userData['nextMeetingDate'] ?? DateTime.now(),
+                            'partner1Image': profile['avatarUrl'],
+                            'partner2Image': null,
+                          },
                         );
                       }
                     },
