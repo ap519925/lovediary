@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:lovediary/core/utils/date_utils.dart';
+import 'package:lovediary/core/utils/logger.dart';
 import 'package:lovediary/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:lovediary/features/auth/presentation/bloc/auth_state.dart';
 import 'package:lovediary/features/auth/presentation/screens/login_screen.dart';
@@ -22,18 +24,6 @@ import 'package:lovediary/core/localization_wrapper.dart';
 class App extends StatelessWidget {
   const App({super.key});
 
-  DateTime _convertToDateTime(dynamic timestamp) {
-    if (timestamp is Timestamp) {
-      return timestamp.toDate();
-    } else if (timestamp is int) {
-      return DateTime.fromMillisecondsSinceEpoch(timestamp);
-    } else if (timestamp is String) {
-      return DateTime.parse(timestamp);
-    } else {
-      return DateTime.now();
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<ThemeBloc, ThemeState>(
@@ -44,17 +34,29 @@ class App extends StatelessWidget {
               title: 'Love Diary',
               theme: ThemeData(
                 primarySwatch: Colors.blueGrey,
-                brightness: Brightness.dark,
-                scaffoldBackgroundColor: Colors.grey[900],
+                brightness: Brightness.light,
+                scaffoldBackgroundColor: Colors.grey[100],
                 appBarTheme: AppBarTheme(
-                  backgroundColor: Colors.grey[900],
+                  backgroundColor: Colors.blueGrey,
                   elevation: 0,
+                ),
+                colorScheme: ColorScheme.light(
+                  primary: Colors.blueGrey,
+                  secondary: Colors.pinkAccent,
                 ),
               ),
               darkTheme: ThemeData(
                 primarySwatch: Colors.blueGrey,
                 brightness: Brightness.dark,
                 scaffoldBackgroundColor: Colors.grey[900],
+                appBarTheme: AppBarTheme(
+                  backgroundColor: Colors.grey[900],
+                  elevation: 0,
+                ),
+                colorScheme: ColorScheme.dark(
+                  primary: Colors.blueGrey[300]!,
+                  secondary: Colors.pinkAccent[100]!,
+                ),
               ),
               home: BlocConsumer<AuthBloc, AuthState>(
                 listener: (context, state) {
@@ -74,11 +76,11 @@ class App extends StatelessWidget {
                         partner1Name: profile['displayName'] as String? ?? 'You',
                         partner2Name: profile['partnerName'] as String? ?? 'Partner',
                         anniversaryDate: profile['anniversaryDate'] != null 
-                          ? _convertToDateTime(profile['anniversaryDate'])
+                          ? DateUtil.convertToDateTime(profile['anniversaryDate'])
                           : DateTime.now(),
                         distanceApart: profile['distanceApart'] as double? ?? 0.0,
                         nextMeetingDate: profile['nextMeetingDate'] != null 
-                          ? _convertToDateTime(profile['nextMeetingDate'])
+                          ? DateUtil.convertToDateTime(profile['nextMeetingDate'])
                           : DateTime.now().add(const Duration(days: 30)),
                         userId: state.user.uid,
                       );

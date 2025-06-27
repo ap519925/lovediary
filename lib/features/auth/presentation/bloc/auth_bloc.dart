@@ -1,11 +1,14 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'dart:math';
+import 'package:lovediary/core/services/error_reporting_service.dart';
+import 'package:lovediary/core/utils/code_generator.dart';
+import 'package:lovediary/core/utils/logger.dart';
 import 'auth_event.dart';
 import 'auth_state.dart';
 
 class AuthBloc extends Bloc<AuthEvent, AuthState> {
+  static const String _tag = 'AuthBloc';
   final FirebaseAuth _auth;
   final FirebaseFirestore _firestore;
 
@@ -26,6 +29,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     Emitter<AuthState> emit,
   ) async {
     emit(AuthLoading());
+    Logger.i(_tag, 'Login requested for email: ${event.email}');
     try {
       final userCredential = await _auth.signInWithEmailAndPassword(
         email: event.email,
@@ -42,8 +46,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         final userData = userDoc.data() as Map<String, dynamic>;
         emit(AuthAuthenticated(userCredential.user!, userData: userData));
       } else {
-        // If user document doesn't exist (rare case), create a new one
-        final userCode = await _getUniqueUserCode();
+      // If user document doesn't exist (rare case), create a new one
+      Logger.i(_tag, 'User document not found, creating new one');
+      final userCode = await CodeGenerator.getUniqueUserCode(_firestore);
         final userData = {
           'email': event.email,
           'createdAt': FieldValue.serverTimestamp(),
@@ -71,90 +76,68 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         await _firestore.collection('users').doc(userCredential.user!.uid).set(userData);
         emit(AuthAuthenticated(userCredential.user!, userData: userData));
       }
-    } catch (e) {
-      emit(AuthFailure(e.toString()));
+    } catch (e, stackTrace) {
+      Logger.e(_tag, 'Login failed', e, stackTrace);
+      
+      // Report the error
+      ErrorReportingService.logError(
+        e, 
+        stackTrace,
+        reason: 'Login failed',
+        information: {
+          'email': event.email,
+          'method': 'email/password',
+        },
+      );
+      
+      // Emit failure state with user-friendly message
+      String errorMessage = 'Login failed';
+      if (e is FirebaseAuthException) {
+        switch (e.code) {
+          case 'user-not-found':
+            errorMessage = 'No user found with this email';
+            break;
+          case 'wrong-password':
+            errorMessage = 'Wrong password provided';
+            break;
+          case 'user-disabled':
+            errorMessage = 'This account has been disabled';
+            break;
+          case 'too-many-requests':
+            errorMessage = 'Too many login attempts. Try again later';
+            break;
+          case 'invalid-email':
+            errorMessage = 'Invalid email address';
+            break;
+          default:
+            errorMessage = 'Authentication failed: ${e.message}';
+        }
+      }
+      
+      emit(AuthFailure(errorMessage));
     }
   }
 
-  // Generate a unique user code (6 characters, alphanumeric)
-  String _generateUniqueUserCode() {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    final random = Random();
-    final code = String.fromCharCodes(
-      Iterable.generate(6, (_) => chars.codeUnitAt(random.nextInt(chars.length)))
-    );
-    print('Generated code: $code'); // Debug log
-    return code;
-  }
-  
-  // Check if a user code already exists
-  Future<bool> _userCodeExists(String code) async {
-    try {
-      print('Checking if code exists: $code'); // Debug log
-      final snapshot = await _firestore
-          .collection('users')
-          .where('userCode', isEqualTo: code)
-          .limit(1)
-          .get();
-      final exists = snapshot.docs.isNotEmpty;
-      print('Code exists: $exists'); // Debug log
-      return exists;
-    } catch (e) {
-      print('Error checking if code exists: $e'); // Debug log
-      return false; // Assume code doesn't exist if there's an error
-    }
-  }
-  
-  // Generate a unique user code that doesn't exist yet
-  Future<String> _getUniqueUserCode() async {
-    String code;
-    bool exists;
-    int attempts = 0;
-    
-    try {
-      do {
-        code = _generateUniqueUserCode();
-        exists = await _userCodeExists(code);
-        attempts++;
-        print('Attempt $attempts: Code $code exists: $exists'); // Debug log
-      } while (exists && attempts < 10); // Limit attempts to avoid infinite loop
-      
-      if (attempts >= 10) {
-        print('Failed to generate unique code after 10 attempts'); // Debug log
-        // Fallback to a timestamp-based code
-        code = 'U${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
-        print('Using fallback code: $code'); // Debug log
-      }
-      
-      return code;
-    } catch (e) {
-      print('Error generating unique code: $e'); // Debug log
-      // Fallback to a timestamp-based code
-      code = 'U${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
-      print('Using fallback code due to error: $code'); // Debug log
-      return code;
-    }
-  }
 
   Future<void> _onRegisterRequested(
     RegisterRequested event,
     Emitter<AuthState> emit,
   ) async {
     emit(AuthLoading());
+    Logger.i(_tag, 'Registration requested for email: ${event.email}');
     try {
-      print('Starting registration process'); // Debug log
       
       final userCredential = await _auth.createUserWithEmailAndPassword(
         email: event.email,
         password: event.password,
       );
       
-      print('User created with UID: ${userCredential.user!.uid}'); // Debug log
+      Logger.i(_tag, 'User created with UID: ${userCredential.user!.uid}');
       
       // Generate a unique user code
-      print('Generating unique user code'); // Debug log
-      final userCode = await _getUniqueUserCode();
-      print('Generated unique code: $userCode'); // Debug log
+      Logger.d(_tag, 'Generating unique user code');
+      final userCode = await CodeGenerator.getUniqueUserCode(_firestore);
+      Logger.i(_tag, 'Generated unique code: $userCode');
       
       // Create user data with the unique code
       final userData = {
@@ -182,15 +165,48 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       };
       
       // Save user data to Firestore
-      print('Saving user data to Firestore'); // Debug log
+      Logger.d(_tag, 'Saving user data to Firestore');
       await _firestore.collection('users').doc(userCredential.user!.uid).set(userData);
-      print('User data saved to Firestore'); // Debug log
+      Logger.i(_tag, 'User data saved to Firestore');
       
       // Emit authenticated state with user data
-      print('Emitting AuthAuthenticated state with user data'); // Debug log
       emit(AuthAuthenticated(userCredential.user!, userData: userData));
-    } catch (e) {
-      emit(AuthFailure(e.toString()));
+    } catch (e, stackTrace) {
+      Logger.e(_tag, 'Registration failed', e, stackTrace);
+      
+      // Report the error
+      ErrorReportingService.logError(
+        e, 
+        stackTrace,
+        reason: 'Registration failed',
+        information: {
+          'email': event.email,
+          'method': 'email/password',
+        },
+      );
+      
+      // Emit failure state with user-friendly message
+      String errorMessage = 'Registration failed';
+      if (e is FirebaseAuthException) {
+        switch (e.code) {
+          case 'email-already-in-use':
+            errorMessage = 'This email is already in use';
+            break;
+          case 'weak-password':
+            errorMessage = 'The password is too weak';
+            break;
+          case 'invalid-email':
+            errorMessage = 'Invalid email address';
+            break;
+          case 'operation-not-allowed':
+            errorMessage = 'Email/password accounts are not enabled';
+            break;
+          default:
+            errorMessage = 'Registration failed: ${e.message}';
+        }
+      }
+      
+      emit(AuthFailure(errorMessage));
     }
   }
 
@@ -198,7 +214,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     LogoutRequested event,
     Emitter<AuthState> emit,
   ) async {
+    Logger.i(_tag, 'Logout requested');
     await _auth.signOut();
+    Logger.i(_tag, 'User signed out');
     emit(AuthUnauthenticated());
   }
 
@@ -207,25 +225,47 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     Emitter<AuthState> emit,
   ) async {
     emit(AuthLoading());
+    Logger.i(_tag, 'Link partner requested: ${event.partnerId}');
     try {
       final partnerDoc = await _firestore.collection('users').doc(event.partnerId).get();
       if (!partnerDoc.exists) {
+        Logger.w(_tag, 'Partner not found: ${event.partnerId}');
         emit(AuthFailure('Partner not found'));
         return;
       }
 
       final batch = _firestore.batch();
+      // Update both user documents with partner information
       batch.update(_firestore.collection('users').doc(event.userId), {
         'partnerId': event.partnerId,
+        'profile.partnerId': event.partnerId,
+        'profile.relationshipStatus': 'in_relationship',
       });
       batch.update(_firestore.collection('users').doc(event.partnerId), {
         'partnerId': event.userId,
+        'profile.partnerId': event.userId,
+        'profile.relationshipStatus': 'in_relationship',
       });
       await batch.commit();
+      Logger.i(_tag, 'Partner linked successfully');
       
       emit(PartnerLinkedSuccessfully());
-    } catch (e) {
-      emit(AuthFailure('Failed to link partner: ${e.toString()}'));
+    } catch (e, stackTrace) {
+      Logger.e(_tag, 'Failed to link partner', e, stackTrace);
+      
+      // Report the error
+      ErrorReportingService.logError(
+        e, 
+        stackTrace,
+        reason: 'Partner linking failed',
+        information: {
+          'userId': event.userId,
+          'partnerId': event.partnerId,
+        },
+      );
+      
+      // Emit failure state with user-friendly message
+      emit(AuthFailure('Failed to link partner. Please try again later.'));
     }
   }
 }

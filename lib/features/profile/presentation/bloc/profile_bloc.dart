@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 import 'dart:math';
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
@@ -697,7 +696,12 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
   ) async {
     emit(ProfileLoading());
     try {
-      // Create a new post document
+      // Get user profile data
+      final userDoc = await firestore.collection('users').doc(event.userId).get();
+      final userData = userDoc.data();
+      final userProfile = userData?['profile'] as Map<String, dynamic>? ?? {};
+      
+      // Create a new post document with user data
       await firestore.collection('posts').add({
         'userId': event.userId,
         'content': event.content,
@@ -705,6 +709,8 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
         'createdAt': FieldValue.serverTimestamp(),
         'likes': 0,
         'comments': [],
+        'userName': userProfile['displayName'] ?? 'Anonymous',
+        'userProfileImage': userProfile['avatarUrl'],
       });
       
       emit(PostCreated());
@@ -720,33 +726,57 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
     FetchPosts event,
     Emitter<ProfileState> emit,
   ) async {
-    // Don't emit ProfileLoading here to avoid overriding ProfileLoaded state
+    emit(ProfileLoading());
+    print('=== FETCHING POSTS ===');
+    print('User ID: ${event.userId}');
+    
     try {
-      // Get posts for the user without ordering first to avoid index issues
+      // Get posts for the user
       final snapshot = await firestore
           .collection('posts')
           .where('userId', isEqualTo: event.userId)
+          .orderBy('createdAt', descending: true)
           .get();
+
+      print('Found ${snapshot.docs.length} posts for user ${event.userId}');
       
-      // Then sort the results in memory
-      final docs = snapshot.docs;
-      docs.sort((a, b) {
-        final aTimestamp = a.data()['createdAt'] as Timestamp?;
-        final bTimestamp = b.data()['createdAt'] as Timestamp?;
-        
-        if (aTimestamp == null && bTimestamp == null) return 0;
-        if (aTimestamp == null) return 1;
-        if (bTimestamp == null) return -1;
-        
-        // Sort in descending order (newest first)
-        return bTimestamp.compareTo(aTimestamp);
-      });
+      if (snapshot.docs.isEmpty) {
+        print('No posts found for user');
+        emit(PostsLoaded([]));
+        return;
+      }
       
-      emit(PostsLoaded(docs));
-    } catch (e) {
-      print('Error fetching posts: ${e.toString()}');
-      // Don't emit ProfileError for posts - just emit empty posts
-      emit(PostsLoaded([]));
+      // Log each post for debugging
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        print('Post ${doc.id}: ${data['content']?.toString().substring(0, 50) ?? 'No content'}...');
+      }
+      
+      emit(PostsLoaded(snapshot.docs));
+      print('=== POSTS LOADED SUCCESSFULLY ===');
+    } catch (e, stackTrace) {
+      print('=== ERROR FETCHING POSTS ===');
+      print('Error: $e');
+      print('Stack trace: $stackTrace');
+      
+      String errorMessage = 'Failed to load posts';
+      if (e.toString().contains('index')) {
+        errorMessage = 'Database needs configuration - please wait a few minutes and try again.\n'
+                      'If the issue persists, visit Firebase Console > Firestore > Indexes '
+                      'to create the required composite index.';
+        print('FIRESTORE INDEX ERROR: Missing composite index for posts query');
+        print('Required index fields: userId (ascending), createdAt (descending)');
+        print('Auto-indexing may take a few minutes to complete');
+      } else if (e.toString().contains('permission')) {
+        errorMessage = 'Permission denied - please check your account permissions';
+        print('FIRESTORE PERMISSION ERROR: Check security rules for posts collection');
+      } else if (e.toString().contains('network')) {
+        errorMessage = 'Network connection failed - please check your internet and try again';
+        print('NETWORK ERROR: Connection to Firestore failed');
+      }
+      
+      emit(ProfileError(errorMessage));
+      print('=== EMITTED ERROR STATE ===');
     }
   }
   
@@ -761,26 +791,13 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
       try {
         print('Uploading post image, attempt ${attempt + 1}');
         
-        // Get the file path from XFile
-        final filePath = event.imageFile.path;
-        print('Post image file path: $filePath');
-        
-        // Create a File object
-        final file = File(filePath);
-        
-        // Check if file exists
-        if (!await file.exists()) {
-          print('Post image file does not exist at path: $filePath');
-          emit(ProfileError('Post image file not found'));
-          return;
-        }
-        
-        final fileSize = await file.length();
-        print('Post image file size: $fileSize bytes');
+        // Read file bytes directly from XFile (works on all platforms)
+        final bytes = await event.imageFile.readAsBytes();
+        print('Post image file size: ${bytes.length} bytes');
         
         // Check if file size is too large (>10MB)
-        if (fileSize > 10 * 1024 * 1024) {
-          print('File size too large: $fileSize bytes');
+        if (bytes.length > 10 * 1024 * 1024) {
+          print('File size too large: ${bytes.length} bytes');
           emit(ProfileError('Image file too large (max 10MB)'));
           return;
         }
@@ -792,24 +809,26 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
         // Create a reference to the storage location
         final ref = storage.ref().child('posts/$filename');
         
-        // Determine content type based on file extension
+        // Determine content type based on file name
         String contentType = 'image/jpeg';
-        if (filePath.toLowerCase().endsWith('.png')) {
+        final imageFileName = event.imageFile.name.toLowerCase();
+        if (imageFileName.endsWith('.png')) {
           contentType = 'image/png';
-        } else if (filePath.toLowerCase().endsWith('.gif')) {
+        } else if (imageFileName.endsWith('.gif')) {
           contentType = 'image/gif';
-        } else if (filePath.toLowerCase().endsWith('.webp')) {
+        } else if (imageFileName.endsWith('.webp')) {
           contentType = 'image/webp';
         }
         
-        // Upload the file with metadata
+        // Upload the file with metadata using putData (works on all platforms)
         final metadata = SettableMetadata(
           contentType: contentType,
           customMetadata: {'userId': event.userId, 'type': 'post'},
+          cacheControl: 'public, max-age=31536000',
         );
         
         print('Starting post image upload to Firebase Storage');
-        final uploadTask = ref.putFile(file, metadata);
+        final uploadTask = ref.putData(bytes, metadata);
         
         // Monitor upload progress
         uploadTask.snapshotEvents.listen((TaskSnapshot snapshot) {
@@ -836,19 +855,28 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
         // Check for specific error types
         String errorMessage = 'Failed to upload image';
         if (e is FirebaseException) {
+          print('Firebase error code: ${e.code}');
+          print('Firebase error message: ${e.message}');
+          
           if (e.code == 'unauthorized' || e.code == 'permission-denied') {
-            errorMessage = 'Permission denied: Not authorized to upload images';
+            errorMessage = 'Permission denied: Check Firebase Storage rules';
           } else if (e.code == 'canceled') {
             errorMessage = 'Upload was canceled';
           } else if (e.code == 'storage/quota-exceeded') {
             errorMessage = 'Storage quota exceeded';
+          } else if (e.code == 'storage/object-not-found') {
+            errorMessage = 'Storage path not found';
+          } else if (e.code == 'storage/bucket-not-found') {
+            errorMessage = 'Storage bucket not found';
+          } else if (e.message?.contains('CORS') == true) {
+            errorMessage = 'CORS error: Please configure Firebase Storage CORS policy';
           } else {
-            errorMessage = 'Firebase error: ${e.code}';
+            errorMessage = 'Firebase Storage error: ${e.code} - ${e.message}';
           }
-        } else if (e is SocketException) {
-          errorMessage = 'Network error: Check your internet connection';
         } else if (e is TimeoutException) {
-          errorMessage = 'Upload timed out: Try again later';
+          errorMessage = 'Upload timed out: Try a smaller image or check your connection';
+        } else {
+          errorMessage = 'Upload failed: ${e.toString()}';
         }
         
         if (attempt >= maxRetryAttempts) {

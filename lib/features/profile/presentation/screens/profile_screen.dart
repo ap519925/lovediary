@@ -205,8 +205,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     TextButton(
                       onPressed: () {
-                        // View partner profile
-                        // This would navigate to the partner's profile
+                        // Navigate to partner's profile
+                        final partnerId = currentState.profile['partnerId'];
+                        if (partnerId != null) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => ProfileScreen(
+                                userId: partnerId,
+                              ),
+                            ),
+                          );
+                        }
                       },
                       child: const Text('View Partner'),
                     ),

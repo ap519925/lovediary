@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart'; // For kIsWeb
+import 'package:permission_handler/permission_handler.dart' show openAppSettings;
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:lovediary/features/map/presentation/bloc/map_bloc.dart';
 import 'package:lovediary/features/map/presentation/widgets/custom_marker.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:lovediary/core/services/location_service.dart';
 import 'package:geolocator/geolocator.dart';
 import 'dart:math' as math;
 
@@ -70,21 +69,80 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   Future<void> _requestLocationPermission() async {
-    // For web, skip using permission_handler as it's not supported.
-    if (kIsWeb) {
-      context.read<MapBloc>().add(LoadCurrentLocation());
-      return;
-    }
-    final status = await Permission.location.request();
-    if (status.isGranted) {
-      final userId = FirebaseAuth.instance.currentUser?.uid;
-      if (userId != null) {
+    try {
+      // For web, skip permission request as it's handled by the browser
+      if (kIsWeb) {
+        context.read<MapBloc>().add(LoadCurrentLocation());
+        return;
+      }
+
+      // Use the existing LocationService for consistent permission handling
+      final locationService = LocationService();
+      
+      // Check if location services are enabled first
+      final serviceEnabled = await locationService.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Location services are disabled. Please enable them in settings.'),
+              action: SnackBarAction(
+                label: 'Settings',
+                onPressed: () => locationService.openLocationSettings(),
+              ),
+            ),
+          );
+        }
+        return;
+      }
+
+      // Check current permission status
+      final permission = await locationService.checkPermission();
+      
+      if (permission == LocationPermission.denied) {
+        // Request permission
+        final newPermission = await locationService.requestPermission();
+        if (newPermission == LocationPermission.whileInUse || 
+            newPermission == LocationPermission.always) {
+          // Permission granted, load location
+          context.read<MapBloc>().add(LoadCurrentLocation());
+        } else {
+          // Permission denied
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Location permission is required to show your location on the map.'),
+              ),
+            );
+          }
+        }
+      } else if (permission == LocationPermission.deniedForever) {
+        // Permission permanently denied
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Location permission is permanently denied. Please enable it in app settings.'),
+              action: SnackBarAction(
+                label: 'Settings',
+                onPressed: () => openAppSettings(),
+              ),
+            ),
+          );
+        }
+      } else if (permission == LocationPermission.whileInUse || 
+                 permission == LocationPermission.always) {
+        // Permission already granted
         context.read<MapBloc>().add(LoadCurrentLocation());
       }
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Location permission is required')),
-      );
+    } catch (e) {
+      debugPrint('Error requesting location permission: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Error requesting location permission. Please try again.'),
+          ),
+        );
+      }
     }
   }
 
