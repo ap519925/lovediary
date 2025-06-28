@@ -1,4 +1,6 @@
-part of 'map_bloc.dart';
+import 'package:equatable/equatable.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:lovediary/features/map/data/location_service.dart';
 
 abstract class MapState extends Equatable {
   const MapState();
@@ -25,6 +27,11 @@ class MapLoaded extends MapState {
   final LocationInfo? currentLocationInfo;
   final LocationInfo? partnerLocationInfo;
   final double? distance;
+
+  // Getters for backward compatibility
+  LatLng? get userLocation => currentLocation;
+  String? get userLocationName => currentLocationInfo?.toString();
+  String? get partnerLocationName => partnerLocationInfo?.toString();
 
   @override
   List<Object> get props => [

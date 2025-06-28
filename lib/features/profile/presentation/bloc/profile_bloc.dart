@@ -80,7 +80,9 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
       if (attempts >= 10) {
         print('Failed to generate unique code after 10 attempts'); // Debug log
         // Fallback to a timestamp-based code
-        code = 'U${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
+        final timestamp = DateTime.now().millisecondsSinceEpoch.toString();
+        final suffix = timestamp.length > 7 ? timestamp.substring(timestamp.length - 6) : timestamp;
+        code = 'U$suffix';
         print('Using fallback code: $code'); // Debug log
       }
       
@@ -88,7 +90,9 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
     } catch (e) {
       print('Error generating unique code: $e'); // Debug log
       // Fallback to a timestamp-based code
-      code = 'U${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
+      final timestamp = DateTime.now().millisecondsSinceEpoch.toString();
+      final suffix = timestamp.length > 7 ? timestamp.substring(timestamp.length - 6) : timestamp;
+      code = 'U$suffix';
       print('Using fallback code due to error: $code'); // Debug log
       return code;
     }
@@ -749,7 +753,9 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
       // Log each post for debugging
       for (var doc in snapshot.docs) {
         final data = doc.data();
-        print('Post ${doc.id}: ${data['content']?.toString().substring(0, 50) ?? 'No content'}...');
+        final content = data['content']?.toString() ?? 'No content';
+        final preview = content.length > 50 ? content.substring(0, 50) : content;
+        print('Post ${doc.id}: $preview...');
       }
       
       emit(PostsLoaded(snapshot.docs));

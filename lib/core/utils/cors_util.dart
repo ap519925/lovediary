@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:flutter/foundation.dart';
 import 'package:lovediary/core/utils/logger.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart' as http;
@@ -35,13 +34,11 @@ class CorsUtil {
     try {
       Logger.d(_tag, 'Checking CORS configuration for: $bucketUrl');
       
-      // Make an OPTIONS request to check CORS headers
-      final response = await http.options(
+      // Make a HEAD request to check CORS headers (since OPTIONS might not be available)
+      final response = await http.head(
         Uri.parse('$bucketUrl/o'),
         headers: {
           'Origin': 'http://localhost',
-          'Access-Control-Request-Method': 'POST',
-          'Access-Control-Request-Headers': 'Content-Type, Authorization',
         },
       );
       

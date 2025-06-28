@@ -21,6 +21,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     on<LoginRequested>(_onLoginRequested);
     on<RegisterRequested>(_onRegisterRequested);
     on<LogoutRequested>(_onLogoutRequested);
+    on<CheckAuthStatus>(_onCheckAuthStatus);
     on<LinkPartnerRequested>(_onLinkPartnerRequested);
   }
 
@@ -31,28 +32,47 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     emit(AuthLoading());
     Logger.i(_tag, 'Login requested for email: ${event.email}');
     try {
-      final userCredential = await _auth.signInWithEmailAndPassword(
-        email: event.email,
-        password: event.password,
-      );
+      UserCredential? userCredential;
+      
+      // If password is empty, user is already authenticated (from auth state persistence)
+      if (event.password.isEmpty) {
+        final currentUser = _auth.currentUser;
+        if (currentUser != null) {
+          Logger.i(_tag, 'Using existing authenticated user');
+          // Create a mock UserCredential for existing user
+          userCredential = null; // We'll handle this case separately
+        } else {
+          throw Exception('No authenticated user found');
+        }
+      } else {
+        userCredential = await _auth.signInWithEmailAndPassword(
+          email: event.email,
+          password: event.password,
+        );
+      }
+      
+      final user = userCredential?.user ?? _auth.currentUser;
+      if (user == null) {
+        throw Exception('Authentication failed - no user found');
+      }
       
       // Fetch user data from Firestore
       final userDoc = await _firestore
           .collection('users')
-          .doc(userCredential.user!.uid)
+          .doc(user.uid)
           .get();
       
       if (userDoc.exists) {
         final userData = userDoc.data() as Map<String, dynamic>;
-        emit(AuthAuthenticated(userCredential.user!, userData: userData));
+        emit(AuthAuthenticated(user, userData: userData));
       } else {
-      // If user document doesn't exist (rare case), create a new one
-      Logger.i(_tag, 'User document not found, creating new one');
-      final userCode = await CodeGenerator.getUniqueUserCode(_firestore);
+        // If user document doesn't exist (rare case), create a new one
+        Logger.i(_tag, 'User document not found, creating new one');
+        final userCode = await CodeGenerator.getUniqueUserCode(_firestore);
         final userData = {
-          'email': event.email,
+          'email': user.email ?? event.email,
           'createdAt': FieldValue.serverTimestamp(),
-          'userId': userCredential.user!.uid,
+          'userId': user.uid,
           'userCode': userCode,
           'profile': {
             'name': '',
@@ -73,8 +93,8 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
           }
         };
         
-        await _firestore.collection('users').doc(userCredential.user!.uid).set(userData);
-        emit(AuthAuthenticated(userCredential.user!, userData: userData));
+        await _firestore.collection('users').doc(user.uid).set(userData);
+        emit(AuthAuthenticated(user, userData: userData));
       }
     } catch (e, stackTrace) {
       Logger.e(_tag, 'Login failed', e, stackTrace);
@@ -207,6 +227,40 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       }
       
       emit(AuthFailure(errorMessage));
+    }
+  }
+
+  Future<void> _onCheckAuthStatus(
+    CheckAuthStatus event,
+    Emitter<AuthState> emit,
+  ) async {
+    Logger.i(_tag, 'Checking auth status');
+    try {
+      final currentUser = _auth.currentUser;
+      if (currentUser != null) {
+        Logger.i(_tag, 'User is authenticated: ${currentUser.uid}');
+        
+        // Fetch user data from Firestore
+        final userDoc = await _firestore
+            .collection('users')
+            .doc(currentUser.uid)
+            .get();
+        
+        if (userDoc.exists) {
+          final userData = userDoc.data() as Map<String, dynamic>;
+          emit(AuthAuthenticated(currentUser, userData: userData));
+        } else {
+          Logger.w(_tag, 'User document not found, signing out');
+          await _auth.signOut();
+          emit(AuthUnauthenticated());
+        }
+      } else {
+        Logger.i(_tag, 'No authenticated user found');
+        emit(AuthUnauthenticated());
+      }
+    } catch (e, stackTrace) {
+      Logger.e(_tag, 'Error checking auth status', e, stackTrace);
+      emit(AuthUnauthenticated());
     }
   }
 

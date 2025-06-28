@@ -145,4 +145,13 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get systemDefault => '系统默认';
+
+  @override
+  String get noChatMessages => '暂无消息';
+
+  @override
+  String get startConversation => '与您的伴侣开始对话';
+
+  @override
+  String get typeMessage => '输入消息...';
 }

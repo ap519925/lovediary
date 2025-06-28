@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:lovediary/core/utils/date_utils.dart';
-import 'package:lovediary/core/utils/logger.dart';
 import 'package:lovediary/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:lovediary/features/auth/presentation/bloc/auth_state.dart';
 import 'package:lovediary/features/auth/presentation/screens/login_screen.dart';

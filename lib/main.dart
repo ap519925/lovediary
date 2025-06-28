@@ -9,6 +9,7 @@ import 'package:lovediary/core/services/error_reporting_service.dart';
 import 'package:lovediary/core/services/location_service.dart';
 import 'package:lovediary/core/utils/logger.dart';
 import 'package:lovediary/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:lovediary/features/auth/presentation/bloc/auth_event.dart';
 import 'package:lovediary/features/language/presentation/bloc/language_bloc.dart';
 import 'package:lovediary/features/location/presentation/bloc/location_bloc.dart';
 import 'package:lovediary/features/profile/presentation/bloc/profile_bloc.dart';
@@ -35,10 +36,15 @@ void main() async {
         child: MultiBlocProvider(
           providers: [
             BlocProvider(
-              create: (context) => AuthBloc(
-                auth: FirebaseAuth.instance,
-                firestore: FirebaseFirestore.instance,
-              ),
+              create: (context) {
+                final authBloc = AuthBloc(
+                  auth: FirebaseAuth.instance,
+                  firestore: FirebaseFirestore.instance,
+                );
+                // Check for existing auth state on app start
+                _initializeAuthState(authBloc);
+                return authBloc;
+              },
             ),
             BlocProvider(
               create: (context) => ProfileBloc(
@@ -71,4 +77,16 @@ void main() async {
       reason: 'Uncaught error in main zone',
     );
   });
+}
+
+/// Initialize auth state by checking if user is already logged in
+void _initializeAuthState(AuthBloc authBloc) {
+  final currentUser = FirebaseAuth.instance.currentUser;
+  if (currentUser != null) {
+    Logger.i('Main', 'User already authenticated: ${currentUser.uid}');
+    // Check auth state once without triggering login
+    authBloc.add(CheckAuthStatus());
+  } else {
+    Logger.i('Main', 'No authenticated user found');
+  }
 }

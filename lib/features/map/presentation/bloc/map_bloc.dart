@@ -1,13 +1,12 @@
 import 'dart:async';
 import 'package:bloc/bloc.dart';
-import 'package:equatable/equatable.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:lovediary/features/map/data/location_service.dart';
 
-part 'map_event.dart';
-part 'map_state.dart';
+import 'map_event.dart';
+import 'map_state.dart';
 
 class MapBloc extends Bloc<MapEvent, MapState> {
   final FirebaseFirestore firestore;
@@ -20,7 +19,9 @@ class MapBloc extends Bloc<MapEvent, MapState> {
     required this.userId,
     required this.partnerId,
   }) : super(MapInitial()) {
+    on<LoadUserLocations>(_onLoadUserLocations);
     on<LoadCurrentLocation>(_onLoadCurrentLocation);
+    on<UpdateCurrentLocation>(_onUpdateCurrentLocation);
     on<UpdateLocation>(_onUpdateLocation);
   }
 
@@ -35,9 +36,14 @@ class MapBloc extends Bloc<MapEvent, MapState> {
       final position = await Geolocator.getCurrentPosition();
       final currentLocation = LatLng(position.latitude, position.longitude);
       
-      // Start listening to location updates
+      // Start listening to location updates with throttling
       _locationSubscription?.cancel(); // Cancel any existing subscription
-      _locationSubscription = Geolocator.getPositionStream().listen((position) {
+      _locationSubscription = Geolocator.getPositionStream(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          distanceFilter: 10, // Only update when moved 10 meters
+        ),
+      ).listen((position) {
         if (!isClosed) { // Check if bloc is still active before adding events
           add(UpdateLocation(LatLng(position.latitude, position.longitude)));
         }
@@ -72,6 +78,20 @@ class MapBloc extends Bloc<MapEvent, MapState> {
     }
   }
 
+  Future<void> _onLoadUserLocations(
+    LoadUserLocations event,
+    Emitter<MapState> emit,
+  ) async {
+    add(LoadCurrentLocation());
+  }
+
+  Future<void> _onUpdateCurrentLocation(
+    UpdateCurrentLocation event,
+    Emitter<MapState> emit,
+  ) async {
+    add(LoadCurrentLocation());
+  }
+
   Future<void> _onUpdateLocation(
     UpdateLocation event,
     Emitter<MapState> emit,
@@ -80,24 +100,37 @@ class MapBloc extends Bloc<MapEvent, MapState> {
     
     if (state is MapLoaded) {
       final currentState = state as MapLoaded;
-      final partnerLocation = await _getPartnerLocation();
       
-      // Get location information
-      final currentLocationInfo = await LocationService.getLocationInfo(event.location);
-      LocationInfo? partnerLocationInfo;
-      double? distance;
+      // Only update if location has changed significantly (more than 10 meters)
+      final previousLocation = currentState.currentLocation;
+      final distance = LocationService.calculateDistance(
+        previousLocation, 
+        event.location
+      );
       
-      if (partnerLocation != null) {
-        partnerLocationInfo = await LocationService.getLocationInfo(partnerLocation);
-        distance = LocationService.calculateDistance(event.location, partnerLocation);
+      if (distance < 0.01) { // Less than 10 meters, don't update
+        return;
       }
+      
+      // Reuse partner location and info from current state to avoid redundant calls
+      final partnerLocation = currentState.partnerLocation;
+      final partnerLocationInfo = currentState.partnerLocationInfo;
+      
+      // Only recalculate distance if we have partner location
+      double? newDistance;
+      if (partnerLocation != null) {
+        newDistance = LocationService.calculateDistance(event.location, partnerLocation);
+      }
+      
+      // Get location info only for the new user location
+      final currentLocationInfo = await LocationService.getLocationInfo(event.location);
       
       emit(MapLoaded(
         event.location, 
         partnerLocation,
         currentLocationInfo: currentLocationInfo,
         partnerLocationInfo: partnerLocationInfo,
-        distance: distance,
+        distance: newDistance,
       ));
     }
   }

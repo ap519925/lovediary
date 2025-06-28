@@ -45,5 +45,8 @@
   "theme": "主题",
   "darkMode": "深色模式",
   "lightMode": "浅色模式",
-  "systemDefault": "系统默认"
+  "systemDefault": "系统默认",
+  "noChatMessages": "暂无消息",
+  "startConversation": "与您的伴侣开始对话",
+  "typeMessage": "输入消息..."
 }

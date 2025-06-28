@@ -20,7 +20,16 @@ class ErrorReportingService {
     try {
       Logger.i(_tag, 'Initializing error reporting service');
       
-      // Initialize Firebase Crashlytics
+      // Check if we're on web platform
+      if (kIsWeb) {
+        Logger.w(_tag, 'Firebase Crashlytics is not fully supported on web, using fallback error handling');
+        _setupWebErrorHandlers();
+        _initialized = true;
+        Logger.i(_tag, 'Error reporting service initialized for web');
+        return;
+      }
+      
+      // Initialize Firebase Crashlytics for mobile platforms
       _crashlytics = FirebaseCrashlytics.instance;
       
       // Set user identifiers for better error tracking
@@ -33,6 +42,9 @@ class ErrorReportingService {
       Logger.i(_tag, 'Error reporting service initialized');
     } catch (e) {
       Logger.e(_tag, 'Failed to initialize error reporting service', e);
+      // Fallback to basic error handling
+      _setupBasicErrorHandlers();
+      _initialized = true;
     }
   }
   
@@ -41,27 +53,60 @@ class ErrorReportingService {
     // Handle Flutter errors
     FlutterError.onError = (FlutterErrorDetails details) {
       Logger.e(_tag, 'Flutter error', details.exception, details.stack);
-      _crashlytics.recordFlutterError(details);
+      try {
+        _crashlytics.recordFlutterError(details);
+      } catch (e) {
+        Logger.e(_tag, 'Failed to record Flutter error to Crashlytics', e);
+      }
     };
     
     // Handle Dart errors
     PlatformDispatcher.instance.onError = (error, stack) {
       Logger.e(_tag, 'Platform dispatcher error', error, stack);
-      _crashlytics.recordError(error, stack, fatal: true);
+      try {
+        _crashlytics.recordError(error, stack, fatal: true);
+      } catch (e) {
+        Logger.e(_tag, 'Failed to record error to Crashlytics', e);
+      }
       return true;
     };
+  }
+  
+  /// Set up error handlers for web platforms
+  static void _setupWebErrorHandlers() {
+    // Handle Flutter errors
+    FlutterError.onError = (FlutterErrorDetails details) {
+      Logger.e(_tag, 'Flutter error (web)', details.exception, details.stack);
+    };
     
-    // Handle zone errors
-    runZonedGuarded<Future<void>>(() async {
-      // This is where the app would be initialized
-    }, (error, stackTrace) {
-      Logger.e(_tag, 'Uncaught error in zone', error, stackTrace);
-      _crashlytics.recordError(error, stackTrace, fatal: true);
-    });
+    // Handle Dart errors
+    PlatformDispatcher.instance.onError = (error, stack) {
+      Logger.e(_tag, 'Platform dispatcher error (web)', error, stack);
+      return true;
+    };
+  }
+  
+  /// Set up basic error handlers as fallback
+  static void _setupBasicErrorHandlers() {
+    // Handle Flutter errors
+    FlutterError.onError = (FlutterErrorDetails details) {
+      Logger.e(_tag, 'Flutter error (fallback)', details.exception, details.stack);
+    };
+    
+    // Handle Dart errors
+    PlatformDispatcher.instance.onError = (error, stack) {
+      Logger.e(_tag, 'Platform dispatcher error (fallback)', error, stack);
+      return true;
+    };
   }
   
   /// Set user identifiers for better error tracking
   static Future<void> _setUserIdentifiers() async {
+    if (kIsWeb) {
+      Logger.d(_tag, 'Skipping user identifiers setup for web platform');
+      return;
+    }
+    
     try {
       // Get device info
       final deviceInfo = DeviceInfoPlugin();
@@ -108,6 +153,11 @@ class ErrorReportingService {
   static Future<void> setUserId(String userId) async {
     if (!_initialized) await initialize();
     
+    if (kIsWeb) {
+      Logger.d(_tag, 'User ID set for web logging: $userId');
+      return;
+    }
+    
     try {
       await _crashlytics.setUserIdentifier(userId);
       Logger.d(_tag, 'User ID set for error reporting: $userId');
@@ -129,20 +179,27 @@ class ErrorReportingService {
       // Log the error
       Logger.e(_tag, reason ?? 'Error logged', error, stackTrace);
       
-      // Add custom information
+      // Additional information logging
       if (information != null) {
-        for (final entry in information.entries) {
-          await _crashlytics.setCustomKey(entry.key, entry.value.toString());
-        }
+        Logger.d(_tag, 'Error context: $information');
       }
       
-      // Record the error
-      await _crashlytics.recordError(
-        error,
-        stackTrace,
-        reason: reason,
-        fatal: false,
-      );
+      // Record the error (skip for web)
+      if (!kIsWeb) {
+        // Add custom information
+        if (information != null) {
+          for (final entry in information.entries) {
+            await _crashlytics.setCustomKey(entry.key, entry.value.toString());
+          }
+        }
+        
+        await _crashlytics.recordError(
+          error,
+          stackTrace,
+          reason: reason,
+          fatal: false,
+        );
+      }
     } catch (e) {
       Logger.e(_tag, 'Failed to log error', e);
     }
@@ -161,20 +218,27 @@ class ErrorReportingService {
       // Log the error
       Logger.e(_tag, reason ?? 'Fatal error logged', error, stackTrace);
       
-      // Add custom information
+      // Additional information logging
       if (information != null) {
-        for (final entry in information.entries) {
-          await _crashlytics.setCustomKey(entry.key, entry.value.toString());
-        }
+        Logger.d(_tag, 'Fatal error context: $information');
       }
       
-      // Record the error
-      await _crashlytics.recordError(
-        error,
-        stackTrace,
-        reason: reason,
-        fatal: true,
-      );
+      // Record the error (skip for web)
+      if (!kIsWeb) {
+        // Add custom information
+        if (information != null) {
+          for (final entry in information.entries) {
+            await _crashlytics.setCustomKey(entry.key, entry.value.toString());
+          }
+        }
+        
+        await _crashlytics.recordError(
+          error,
+          stackTrace,
+          reason: reason,
+          fatal: true,
+        );
+      }
     } catch (e) {
       Logger.e(_tag, 'Failed to log fatal error', e);
     }
@@ -183,6 +247,11 @@ class ErrorReportingService {
   /// Enable or disable error reporting
   static Future<void> setEnabled(bool enabled) async {
     if (!_initialized) await initialize();
+    
+    if (kIsWeb) {
+      Logger.i(_tag, 'Error reporting ${enabled ? 'enabled' : 'disabled'} (web logging only)');
+      return;
+    }
     
     try {
       await _crashlytics.setCrashlyticsCollectionEnabled(enabled);
@@ -193,14 +262,20 @@ class ErrorReportingService {
   }
   
   /// Test error reporting by forcing a crash
-  static Future<void> testCrash() async {
-    if (!_initialized) await initialize();
+  static void testCrash() {
+    if (kIsWeb) {
+      Logger.w(_tag, 'Crash testing not available on web platform');
+      return;
+    }
     
-    try {
+    if (!_initialized) {
+      initialize().then((_) {
+        Logger.i(_tag, 'Testing error reporting with a forced crash');
+        _crashlytics.crash();
+      });
+    } else {
       Logger.i(_tag, 'Testing error reporting with a forced crash');
-      await _crashlytics.crash();
-    } catch (e) {
-      Logger.e(_tag, 'Failed to test crash', e);
+      _crashlytics.crash();
     }
   }
 }
@@ -227,15 +302,9 @@ class _ErrorBoundaryState extends State<ErrorBoundary> {
   void initState() {
     super.initState();
     ErrorReportingService.initialize();
-  }
-  
-  @override
-  Widget build(BuildContext context) {
-    if (_error != null && widget.errorBuilder != null) {
-      return widget.errorBuilder!(_error!);
-    }
     
-    return ErrorWidget.builder = (FlutterErrorDetails details) {
+    // Set up custom error widget builder
+    ErrorWidget.builder = (FlutterErrorDetails details) {
       // Report the error
       ErrorReportingService.logError(
         details.exception,
@@ -248,30 +317,34 @@ class _ErrorBoundaryState extends State<ErrorBoundary> {
       );
       
       // Save the error
-      _error = details;
-      
-      // Rebuild with the error builder
       if (mounted) {
-        setState(() {});
+        setState(() {
+          _error = details;
+        });
       }
       
       // Return a default error widget if no error builder is provided
-      if (widget.errorBuilder == null) {
-        return Material(
-          color: Colors.red,
-          child: Center(
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Text(
-                'An error occurred: ${details.exception}',
-                style: const TextStyle(color: Colors.white),
-              ),
+      return Material(
+        color: Colors.red,
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Text(
+              'An error occurred: ${details.exception}',
+              style: const TextStyle(color: Colors.white),
             ),
           ),
-        );
-      }
-      
-      return widget.errorBuilder!(details);
+        ),
+      );
     };
+  }
+  
+  @override
+  Widget build(BuildContext context) {
+    if (_error != null && widget.errorBuilder != null) {
+      return widget.errorBuilder!(_error!);
+    }
+    
+    return widget.child;
   }
 }

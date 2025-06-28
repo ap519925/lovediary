@@ -145,4 +145,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get systemDefault => 'System Default';
+
+  @override
+  String get noChatMessages => 'No messages yet';
+
+  @override
+  String get startConversation => 'Start a conversation with your partner';
+
+  @override
+  String get typeMessage => 'Type a message...';
 }

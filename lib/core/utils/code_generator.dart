@@ -46,13 +46,17 @@ class CodeGenerator {
       
       if (attempts >= 10) {
         // Fallback to a timestamp-based code
-        code = 'U${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
+        final timestamp = DateTime.now().millisecondsSinceEpoch.toString();
+        final suffix = timestamp.length > 7 ? timestamp.substring(timestamp.length - 6) : timestamp;
+        code = 'U$suffix';
       }
       
       return code;
     } catch (e) {
       // Fallback to a timestamp-based code
-      code = 'U${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
+      final timestamp = DateTime.now().millisecondsSinceEpoch.toString();
+      final suffix = timestamp.length > 7 ? timestamp.substring(timestamp.length - 6) : timestamp;
+      code = 'U$suffix';
       return code;
     }
   }

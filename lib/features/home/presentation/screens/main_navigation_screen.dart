@@ -8,8 +8,10 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:lovediary/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:lovediary/features/auth/presentation/bloc/auth_event.dart';
 import 'package:lovediary/features/map/presentation/bloc/map_bloc.dart';
+import 'package:lovediary/features/map/presentation/bloc/map_event.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:lovediary/l10n/app_localizations.dart';
+import 'package:lovediary/core/services/partner_service.dart';
 
 class MainNavigationScreen extends StatefulWidget {
   final String partner1Name;
@@ -42,64 +44,29 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     GlobalKey<NavigatorState>(),
     GlobalKey<NavigatorState>(),
   ];
-
-  Future<String?> _getPartnerId(String userId) async {
-    try {
-      // Get the user document
-      final userDoc = await FirebaseFirestore.instance.collection('users').doc(userId).get();
-      
-      if (!userDoc.exists) {
-        print('User document not found');
-        return null;
-      }
-      
-      final userData = userDoc.data();
-      
-      // Check if the user has a partner field
-      if (userData != null && userData.containsKey('partnerId')) {
-        final partnerId = userData['partnerId'] as String?;
-        print('Found partner ID: $partnerId');
-        return partnerId;
-      }
-      
-      // If no direct partner ID, check relationship collection
-      final relationshipQuery = await FirebaseFirestore.instance
-          .collection('relationships')
-          .where('users', arrayContains: userId)
-          .limit(1)
-          .get();
-      
-      if (relationshipQuery.docs.isNotEmpty) {
-        final relationshipData = relationshipQuery.docs.first.data();
-        final users = relationshipData['users'] as List<dynamic>;
-        
-        // Find the other user in the relationship
-        for (final user in users) {
-          if (user != userId) {
-            print('Found partner ID from relationship: $user');
-            return user as String;
-          }
-        }
-      }
-      
-      // User doesn't have a partner yet - this is normal for new users
-      return null;
-    } catch (e) {
-      print('Error getting partner ID: $e');
-      return null;
-    }
+  
+  late final PartnerService _partnerService;
+  
+  @override
+  void initState() {
+    super.initState();
+    _partnerService = PartnerService();
   }
 
   @override
   Widget build(BuildContext context) {
-    return WillPopScope(
-        onWillPop: () async {
+    return PopScope(
+        canPop: false,
+        onPopInvoked: (bool didPop) {
+          if (didPop) return;
+          
           final currentNavigator = _navigatorKeys[_selectedIndex];
           if (currentNavigator.currentState?.canPop() ?? false) {
             currentNavigator.currentState?.pop();
-            return false;
+          } else {
+            // Allow the app to close if we're at the root of all navigators
+            Navigator.of(context).pop();
           }
-          return true;
         },
         child: Scaffold(
           appBar: AppBar(
@@ -141,30 +108,32 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
               Navigator(
                 key: _navigatorKeys[2],
                 onGenerateRoute: (settings) => MaterialPageRoute(
-                  builder: (context) => const CalendarScreen(),
+                  builder: (context) => CalendarScreen(
+                    userId: widget.userId,
+                  ),
                 ),
               ),
               Navigator(
                 key: _navigatorKeys[3],
                 onGenerateRoute: (settings) => MaterialPageRoute(
                   builder: (context) => FutureBuilder<String?>(
-                    future: _getPartnerId(widget.userId),
+                    future: _partnerService.getPartnerId(widget.userId),
                     builder: (context, snapshot) {
                       if (snapshot.connectionState == ConnectionState.waiting) {
                         return const Center(child: CircularProgressIndicator());
                       }
                       
+                      if (snapshot.hasError) {
+                        return Center(child: Text('Error loading map: ${snapshot.error}'));
+                      }
+                      
                       final partnerId = snapshot.data ?? '';
                       
-                      return BlocProvider(
-                        create: (context) => MapBloc(
-                          firestore: FirebaseFirestore.instance,
-                          userId: widget.userId,
-                          partnerId: partnerId,
-                        ),
-                        child: const MapScreen(),
-                      );
-                    },
+                      // Create MapBloc once and update partnerId when available
+                      final mapBloc = BlocProvider.of<MapBloc>(context);
+                      mapBloc.add(UpdatePartnerId(partnerId));
+                      return const MapScreen();
+                                        },
                   ),
                 ),
               ),

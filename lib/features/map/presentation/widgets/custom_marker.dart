@@ -83,7 +83,7 @@ class CustomMarker {
     // Draw text
     final textPainter = TextPainter(
       text: TextSpan(
-        text: initials.substring(0, initials.length > 2 ? 2 : initials.length).toUpperCase(),
+        text: initials.length > 2 ? initials.substring(0, 2).toUpperCase() : initials.toUpperCase(),
         style: TextStyle(
           color: textColor,
           fontSize: fontSize,

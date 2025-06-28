@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:lovediary/features/relationship/data/models/relationship_model.dart';
-import 'package:lovediary/features/ai_insights/data/models/ai_insight_model.dart';
 import 'package:lovediary/features/gamification/data/models/game_model.dart';
 import 'dart:math';
 import 'package:lovediary/features/translation/data/translation_service.dart';

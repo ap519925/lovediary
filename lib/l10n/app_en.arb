@@ -45,5 +45,8 @@
   "theme": "Theme",
   "darkMode": "Dark Mode",
   "lightMode": "Light Mode",
-  "systemDefault": "System Default"
+  "systemDefault": "System Default",
+  "noChatMessages": "No messages yet",
+  "startConversation": "Start a conversation with your partner",
+  "typeMessage": "Type a message..."
 }
